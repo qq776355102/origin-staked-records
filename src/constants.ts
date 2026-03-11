@@ -8,9 +8,6 @@ export const CONTRACTS = {
   STAKING_600: [
     "0x8cA97F41d2C81AF050656e8AD0Cf543820a24504",
   ],
-  FLEXIBLE: [
-    "0x1964Ca90474b11FFD08af387b110ba6C96251Bfc",
-  ],
 };
 
 export const DECIMALS = {
@@ -27,11 +24,9 @@ export const TOKENS = {
 export const EVENT_ABIS = [
   "event DepositToken(address indexed currency, address indexed user, uint256 amount)",
   "event Staked(address indexed user, uint256 amount)",
-  "event Staked(address indexed staker, uint256 amount)", // For Flexible
 ];
 
 export const CATEGORIES = {
-  BOND: "债券存款",
+  BOND: "360债券",
   STAKING_600: "600天质押",
-  FLEXIBLE: "活期存款",
 };

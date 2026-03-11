@@ -53,7 +53,6 @@ interface UserSummary {
   address: string;
   bond: number;
   staking600: number;
-  flexible: number;
   records: DepositRecord[];
 }
 
@@ -143,8 +142,7 @@ export default function App() {
 
       const allContracts = [
         ...CONTRACTS.BOND,
-        ...CONTRACTS.STAKING_600,
-        ...CONTRACTS.FLEXIBLE
+        ...CONTRACTS.STAKING_600
       ];
 
       for (let from = startBlock; from <= endBlock; from += batchSize) {
@@ -207,8 +205,6 @@ export default function App() {
               category = CATEGORIES.BOND;
             } else if (CONTRACTS.STAKING_600.some(c => c.toLowerCase() === log.address.toLowerCase())) {
               category = CATEGORIES.STAKING_600;
-            } else if (CONTRACTS.FLEXIBLE.some(c => c.toLowerCase() === log.address.toLowerCase())) {
-              category = CATEGORIES.FLEXIBLE;
             }
 
             allRecords.push({
@@ -234,7 +230,6 @@ export default function App() {
           address: checksumAddr,
           bond: 0,
           staking600: 0,
-          flexible: 0,
           records: []
         });
       });
@@ -246,7 +241,6 @@ export default function App() {
           const amt = parseFloat(rec.amount);
           if (rec.category === CATEGORIES.BOND) summary.bond += amt;
           if (rec.category === CATEGORIES.STAKING_600) summary.staking600 += amt;
-          if (rec.category === CATEGORIES.FLEXIBLE) summary.flexible += amt;
         }
       });
 
@@ -465,13 +459,10 @@ export default function App() {
                             <p className="text-sm font-mono font-bold text-gray-900">{user.address}</p>
                             <div className="flex gap-3 mt-1">
                               <span className="text-[10px] font-bold uppercase tracking-tighter px-2 py-0.5 bg-amber-50 text-amber-600 rounded border border-amber-100">
-                                债券: {user.bond.toFixed(2)}
+                                360债券: {user.bond.toFixed(2)}
                               </span>
                               <span className="text-[10px] font-bold uppercase tracking-tighter px-2 py-0.5 bg-purple-50 text-purple-600 rounded border border-purple-100">
                                 600天: {user.staking600.toFixed(2)}
-                              </span>
-                              <span className="text-[10px] font-bold uppercase tracking-tighter px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded border border-emerald-100">
-                                活期: {user.flexible.toFixed(2)}
                               </span>
                             </div>
                           </div>
@@ -523,8 +514,7 @@ export default function App() {
                                           <td className="px-4 py-3">
                                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                                               rec.category === CATEGORIES.BOND ? 'bg-amber-100 text-amber-700' :
-                                              rec.category === CATEGORIES.STAKING_600 ? 'bg-purple-100 text-purple-700' :
-                                              'bg-emerald-100 text-emerald-700'
+                                              'bg-purple-100 text-purple-700'
                                             }`}>
                                               {rec.category}
                                             </span>
