@@ -61,6 +61,7 @@ export default function App() {
   const [startDate, setStartDate] = useState<Date | null>(dayjs().subtract(8, 'hour').toDate());
   const [endDate, setEndDate] = useState<Date | null>(new Date());
   const [isScanning, setIsScanning] = useState(false);
+  const [batchSize, setBatchSize] = useState<number>(1000);
   const [progress, setProgress] = useState({ current: 0, total: 0, message: '' });
   const [results, setResults] = useState<UserSummary[]>([]);
   const [expandedUser, setExpandedUser] = useState<string | null>(null);
@@ -127,7 +128,7 @@ export default function App() {
       const startBlock = await estimateBlockHeight(startDate);
       const endBlock = await estimateBlockHeight(endDate);
       
-      const batchSize = 1000;
+      const currentBatchSize = Math.min(Math.max(1, batchSize), 5000);
       const totalBlocks = Math.max(1, endBlock - startBlock);
       const allRecords: DepositRecord[] = [];
 
@@ -145,8 +146,8 @@ export default function App() {
         ...CONTRACTS.STAKING_600
       ];
 
-      for (let from = startBlock; from <= endBlock; from += batchSize) {
-        const to = Math.min(from + batchSize - 1, endBlock);
+      for (let from = startBlock; from <= endBlock; from += currentBatchSize) {
+        const to = Math.min(from + currentBatchSize - 1, endBlock);
         setProgress({ 
           current: from - startBlock, 
           total: totalBlocks, 
@@ -254,20 +255,59 @@ export default function App() {
   };
 
   const exportToExcel = (userSummary?: UserSummary) => {
-    const dataToExport = userSummary 
-      ? userSummary.records 
-      : results.flatMap(r => r.records);
+    let dataToExport: any[] = [];
 
-    const worksheet = XLSX.utils.json_to_sheet(dataToExport.map(r => ({
-      '用户地址': r.user,
-      '类型': r.category,
-      '金额': parseFloat(r.amount).toFixed(2),
-      '北京时间': formatBeijingTime(r.timestamp),
-      '区块高度': r.blockNumber,
-      '交易哈希': r.hash,
-      '合约地址': r.contract
-    })));
+    if (userSummary) {
+      if (userSummary.records.length > 0) {
+        dataToExport = userSummary.records.map(r => ({
+          '用户地址': r.user,
+          '类型': r.category,
+          '金额': parseFloat(r.amount).toFixed(2),
+          '北京时间': formatBeijingTime(r.timestamp),
+          '区块高度': r.blockNumber,
+          '交易哈希': r.hash,
+          '合约地址': r.contract
+        }));
+      } else {
+        dataToExport = [{
+          '用户地址': userSummary.address,
+          '类型': '无记录',
+          '金额': '0.00',
+          '北京时间': '-',
+          '区块高度': '-',
+          '交易哈希': '-',
+          '合约地址': '-'
+        }];
+      }
+    } else {
+      results.forEach(user => {
+        if (user.records.length > 0) {
+          user.records.forEach(r => {
+            dataToExport.push({
+              '用户地址': r.user,
+              '类型': r.category,
+              '金额': parseFloat(r.amount).toFixed(2),
+              '北京时间': formatBeijingTime(r.timestamp),
+              '区块高度': r.blockNumber,
+              '交易哈希': r.hash,
+              '合约地址': r.contract
+            });
+          });
+        } else {
+          dataToExport.push({
+            '用户地址': user.address,
+            '类型': '无记录',
+            '金额': '0.00',
+            '北京时间': '-',
+            '区块高度': '-',
+            '交易哈希': '-',
+            '合约地址': '-'
+          });
+        }
+      });
+    }
 
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "存款详情");
     XLSX.writeFile(workbook, `存款记录_${dayjs().format('YYYYMMDD_HHmmss')}.xlsx`);
@@ -325,6 +365,19 @@ export default function App() {
                 </div>
 
                 <div className="grid grid-cols-1 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5 flex items-center gap-2">
+                      <Database className="w-4 h-4 text-emerald-600" /> 扫描步长 (最大 5000)
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="5000"
+                      className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all outline-none text-sm"
+                      value={batchSize}
+                      onChange={(e) => setBatchSize(parseInt(e.target.value) || 1000)}
+                    />
+                  </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5 flex items-center gap-2">
                       <Calendar className="w-4 h-4 text-emerald-600" /> 开始时间
