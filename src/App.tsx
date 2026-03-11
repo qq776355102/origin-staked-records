@@ -202,15 +202,44 @@ export default function App() {
             }
             
             let category = "未知";
+            let finalAmount = ethers.formatUnits(amount, decimals);
+
             if (CONTRACTS.BOND.some(c => c.toLowerCase() === log.address.toLowerCase())) {
               category = CATEGORIES.BOND;
             } else if (CONTRACTS.STAKING_600.some(c => c.toLowerCase() === log.address.toLowerCase())) {
               category = CATEGORIES.STAKING_600;
+              
+              // For 600-day staking, we only care about the DAI transfer amount from the transaction logs
+              let daiAmountStr = "0.00";
+              try {
+                const receipt = await provider.getTransactionReceipt(log.transactionHash);
+                if (receipt) {
+                  const transferTopic = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
+                  const userTopic = ethers.zeroPadValue(user, 32).toLowerCase();
+                  const targetContractTopic = ethers.zeroPadValue(log.address, 32).toLowerCase();
+                  const daiContract = "0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063".toLowerCase();
+
+                  const daiLog = receipt.logs.find(l => 
+                    l.address.toLowerCase() === daiContract &&
+                    l.topics[0] === transferTopic &&
+                    l.topics[1].toLowerCase() === userTopic &&
+                    l.topics[2].toLowerCase() === targetContractTopic
+                  );
+
+                  if (daiLog) {
+                    const val = BigInt(daiLog.data);
+                    daiAmountStr = ethers.formatUnits(val, 18);
+                  }
+                }
+              } catch (err) {
+                console.error("Failed to fetch receipt for DAI parsing", err);
+              }
+              finalAmount = daiAmountStr;
             }
 
             allRecords.push({
               user: user,
-              amount: ethers.formatUnits(amount, decimals),
+              amount: finalAmount,
               category,
               timestamp: block ? Number(block.timestamp) : 0,
               hash: log.transactionHash,
