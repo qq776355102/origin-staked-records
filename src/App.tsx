@@ -411,7 +411,7 @@ export default function App() {
                     <label className="block text-sm font-medium text-gray-700 mb-1.5 flex items-center gap-2">
                       <Calendar className="w-4 h-4 text-emerald-600" /> 开始时间
                     </label>
-                    <div className="relative">
+                    <div className="relative" key="start-date-container">
                       <DatePicker
                         selected={startDate}
                         onChange={(date) => setStartDate(date)}
@@ -419,6 +419,7 @@ export default function App() {
                         timeFormat="HH:mm"
                         timeIntervals={15}
                         dateFormat="yyyy-MM-dd HH:mm:ss"
+                        portalId="datepicker-portal"
                         className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all outline-none text-sm"
                       />
                     </div>
@@ -427,7 +428,7 @@ export default function App() {
                     <label className="block text-sm font-medium text-gray-700 mb-1.5 flex items-center gap-2">
                       <Calendar className="w-4 h-4 text-emerald-600" /> 结束时间
                     </label>
-                    <div className="relative">
+                    <div className="relative" key="end-date-container">
                       <DatePicker
                         selected={endDate}
                         onChange={(date) => setEndDate(date)}
@@ -435,6 +436,7 @@ export default function App() {
                         timeFormat="HH:mm"
                         timeIntervals={15}
                         dateFormat="yyyy-MM-dd HH:mm:ss"
+                        portalId="datepicker-portal"
                         className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all outline-none text-sm"
                       />
                     </div>
