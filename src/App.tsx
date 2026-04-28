@@ -53,6 +53,7 @@ interface UserSummary {
   address: string;
   bond: number;
   staking600: number;
+  staking360Long: number;
   records: DepositRecord[];
 }
 
@@ -143,7 +144,8 @@ export default function App() {
 
       const allContracts = [
         ...CONTRACTS.BOND,
-        ...CONTRACTS.STAKING_600
+        ...CONTRACTS.STAKING_600,
+        ...CONTRACTS.STAKING_360_LONG
       ];
 
       for (let from = startBlock; from <= endBlock; from += currentBatchSize) {
@@ -235,6 +237,8 @@ export default function App() {
                 console.error("Failed to fetch receipt for DAI parsing", err);
               }
               finalAmount = daiAmountStr;
+            } else if (CONTRACTS.STAKING_360_LONG.some(c => c.toLowerCase() === log.address.toLowerCase())) {
+              category = CATEGORIES.STAKING_360_LONG;
             }
 
             allRecords.push({
@@ -260,6 +264,7 @@ export default function App() {
           address: checksumAddr,
           bond: 0,
           staking600: 0,
+          staking360Long: 0,
           records: []
         });
       });
@@ -271,6 +276,7 @@ export default function App() {
           const amt = parseFloat(rec.amount);
           if (rec.category === CATEGORIES.BOND) summary.bond += amt;
           if (rec.category === CATEGORIES.STAKING_600) summary.staking600 += amt;
+          if (rec.category === CATEGORIES.STAKING_360_LONG) summary.staking360Long += amt;
         }
       });
 
@@ -548,6 +554,9 @@ export default function App() {
                               <span className="text-[10px] font-bold uppercase tracking-tighter px-2 py-0.5 bg-purple-50 text-purple-600 rounded border border-purple-100">
                                 600天: {user.staking600.toFixed(2)}
                               </span>
+                              <span className="text-[10px] font-bold uppercase tracking-tighter px-2 py-0.5 bg-blue-50 text-blue-600 rounded border border-blue-100">
+                                360长期: {user.staking360Long.toFixed(2)}
+                              </span>
                             </div>
                           </div>
                         </div>
@@ -598,7 +607,8 @@ export default function App() {
                                           <td className="px-4 py-3">
                                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                                               rec.category === CATEGORIES.BOND ? 'bg-amber-100 text-amber-700' :
-                                              'bg-purple-100 text-purple-700'
+                                              rec.category === CATEGORIES.STAKING_600 ? 'bg-purple-100 text-purple-700' :
+                                              'bg-blue-100 text-blue-700'
                                             }`}>
                                               {rec.category}
                                             </span>

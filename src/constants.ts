@@ -8,6 +8,9 @@ export const CONTRACTS = {
   STAKING_600: [
     "0x8cA97F41d2C81AF050656e8AD0Cf543820a24504",
   ],
+  STAKING_360_LONG: [
+    "0x6652d0f0d7aec5070804e55b7023d32b9bbc4190",
+  ],
 };
 
 export const DECIMALS = {
@@ -29,4 +32,5 @@ export const EVENT_ABIS = [
 export const CATEGORIES = {
   BOND: "360债券",
   STAKING_600: "600天质押",
+  STAKING_360_LONG: "360长期质押",
 };
