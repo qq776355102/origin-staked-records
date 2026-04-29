@@ -67,6 +67,7 @@ export default function App() {
   const [results, setResults] = useState<UserSummary[]>([]);
   const [expandedUser, setExpandedUser] = useState<string | null>(null);
   const [latestBlock, setLatestBlock] = useState<{ number: number; timestamp: number } | null>(null);
+  const [estimatedRange, setEstimatedRange] = useState<{ start: number; end: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const provider = useMemo(() => new ethers.JsonRpcProvider(RPC_URL), []);
@@ -91,21 +92,43 @@ export default function App() {
     return dayjs.unix(timestamp).tz(BEIJING_TZ).format('YYYY-MM-DD HH:mm:ss');
   };
 
-  const estimateBlockHeight = async (date: Date) => {
+  const estimateBlockHeight = async (date: Date, latest?: { number: number; timestamp: number }) => {
+    // Selected date is Beijing Time. Blockchain uses UTC.
+    // Subtract 8 hours to align with UTC for block estimation.
     const targetTimestamp = dayjs(date).unix();
-    if (!latestBlock) {
+    const refBlock = latest || latestBlock;
+    
+    // Exact 2.0s per block interval as requested
+    const avgBlockTime = 2; 
+
+    if (!refBlock) {
       const blockNum = await provider.getBlockNumber();
       const block = await provider.getBlock(blockNum);
       if (!block) throw new Error("Could not fetch block");
-      const avgBlockTime = 2.1; // Polygon avg
+      
       const diff = Number(block.timestamp) - targetTimestamp;
       return Math.max(0, block.number - Math.floor(diff / avgBlockTime));
     } else {
-      const avgBlockTime = 2.1;
-      const diff = latestBlock.timestamp - targetTimestamp;
-      return Math.max(0, latestBlock.number - Math.floor(diff / avgBlockTime));
+      const diff = refBlock.timestamp - targetTimestamp;
+      return Math.max(0, refBlock.number - Math.floor(diff / avgBlockTime));
     }
   };
+
+  // Update estimated range whenever dates or latest block changes
+  useEffect(() => {
+    const updateRange = async () => {
+      if (startDate && endDate && latestBlock) {
+        try {
+          const start = await estimateBlockHeight(startDate);
+          const end = await estimateBlockHeight(endDate);
+          setEstimatedRange({ start, end });
+        } catch (e) {
+          console.error("Range calculation failed", e);
+        }
+      }
+    };
+    updateRange();
+  }, [startDate, endDate, latestBlock]);
 
   const scanBlocks = async () => {
     setError(null);
@@ -117,6 +140,13 @@ export default function App() {
         throw new Error("请选择开始和结束时间");
       }
 
+      // Refresh latest block right before scan for peak accuracy
+      const blockNum = await provider.getBlockNumber();
+      const block = await provider.getBlock(blockNum);
+      if (!block) throw new Error("无法获取最新区块");
+      const currentLatest = { number: block.number, timestamp: Number(block.timestamp) };
+      setLatestBlock(currentLatest);
+
       const addresses = userAddressesInput
         .split(/[\n, ]+/)
         .map(a => a.trim())
@@ -126,8 +156,8 @@ export default function App() {
         throw new Error("请输入有效的用户地址");
       }
 
-      const startBlock = await estimateBlockHeight(startDate);
-      const endBlock = await estimateBlockHeight(endDate);
+      const startBlock = await estimateBlockHeight(startDate, currentLatest);
+      const endBlock = await estimateBlockHeight(endDate, currentLatest);
       
       const currentBatchSize = Math.min(Math.max(1, batchSize), 5000);
       const totalBlocks = Math.max(1, endBlock - startBlock);
@@ -453,6 +483,18 @@ export default function App() {
                     </div>
                   </div>
                 </div>
+
+                {estimatedRange && (
+                  <div className="p-3 bg-blue-50 border border-blue-100 rounded-xl">
+                    <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest mb-1">预估扫描范围</p>
+                    <div className="flex justify-between items-center text-xs font-mono text-blue-800">
+                      <span># {estimatedRange.start}</span>
+                      <ChevronRight className="w-3 h-3 mx-2 opacity-50" />
+                      <span># {estimatedRange.end}</span>
+                    </div>
+                    <p className="text-[9px] text-blue-400 mt-1 italic">* 步长: {batchSize}, 周期: {Math.max(0, estimatedRange.end - estimatedRange.start)} 块</p>
+                  </div>
+                )}
 
                 <button
                   onClick={scanBlocks}
