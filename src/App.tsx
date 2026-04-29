@@ -134,10 +134,11 @@ export default function App() {
       const allRecords: DepositRecord[] = [];
 
       // Event topics
-      const stakedTopic = "0x9e71bc8eea02a63969f509818f2dafb9254532904319f9dbda79b67bd34a5f3d";
+      const stakedTopic600 = "0x9e71bc8eea02a63969f509818f2dafb9254532904319f9dbda79b67bd34a5f3d";
+      const stakedTopic360Long = "0x8acf475137e0cd74ca7f611d16b1e6383ec9a9c71a8e5b85967781b9c7214d11";
       const bondTopic = "0x4b3f81827ede20c81afbf1bb77b954afcdcae24d391d99042310cb1d9210dd57";
 
-      const topics = [[stakedTopic, bondTopic]];
+      const topics = [[stakedTopic600, stakedTopic360Long, bondTopic]];
       // Add user addresses as the second topic (indexed parameter)
       const userTopics = addresses.map(a => ethers.zeroPadValue(ethers.getAddress(a), 32));
       topics.push(userTopics);
@@ -191,7 +192,8 @@ export default function App() {
             } else {
               // Staked(address indexed user, uint256 amount) or Staked(address indexed staker, uint256 amount)
               user = ethers.getAddress(ethers.dataSlice(log.topics[1], 12));
-              amount = BigInt(log.data);
+              // Parsing amount from data. For Staked(address,uint256,uint8), amount is the first 32 bytes.
+              amount = BigInt(ethers.dataSlice(log.data, 0, 32));
               decimals = DECIMALS.LGNS;
             }
             
@@ -208,10 +210,15 @@ export default function App() {
 
             if (CONTRACTS.BOND.some(c => c.toLowerCase() === log.address.toLowerCase())) {
               category = CATEGORIES.BOND;
-            } else if (CONTRACTS.STAKING_600.some(c => c.toLowerCase() === log.address.toLowerCase())) {
-              category = CATEGORIES.STAKING_600;
+            } else if (
+              CONTRACTS.STAKING_600.some(c => c.toLowerCase() === log.address.toLowerCase()) ||
+              CONTRACTS.STAKING_360_LONG.some(c => c.toLowerCase() === log.address.toLowerCase())
+            ) {
+              category = CONTRACTS.STAKING_600.some(c => c.toLowerCase() === log.address.toLowerCase()) 
+                ? CATEGORIES.STAKING_600 
+                : CATEGORIES.STAKING_360_LONG;
               
-              // For 600-day staking, we only care about the DAI transfer amount from the transaction logs
+              // For these categories, we parse the DAI transfer amount from the transaction logs
               let daiAmountStr = "0.00";
               try {
                 const receipt = await provider.getTransactionReceipt(log.transactionHash);
@@ -237,8 +244,6 @@ export default function App() {
                 console.error("Failed to fetch receipt for DAI parsing", err);
               }
               finalAmount = daiAmountStr;
-            } else if (CONTRACTS.STAKING_360_LONG.some(c => c.toLowerCase() === log.address.toLowerCase())) {
-              category = CATEGORIES.STAKING_360_LONG;
             }
 
             allRecords.push({

@@ -27,6 +27,7 @@ export const TOKENS = {
 export const EVENT_ABIS = [
   "event DepositToken(address indexed currency, address indexed user, uint256 amount)",
   "event Staked(address indexed user, uint256 amount)",
+  "event Staked(address indexed user, uint256 amount, uint8 duration)",
 ];
 
 export const CATEGORIES = {
