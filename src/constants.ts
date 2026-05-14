@@ -34,5 +34,5 @@ export const EVENT_ABIS = [
 export const CATEGORIES = {
   BOND: "360债券",
   STAKING_600: "600天质押",
-  STAKING_360_LONG: "360长期质押",
+  STAKING_360_LONG: "创世360",
 };

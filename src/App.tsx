@@ -618,7 +618,7 @@ export default function App() {
                                 600天: {user.staking600.toFixed(2)}
                               </span>
                               <span className="text-[10px] font-bold uppercase tracking-tighter px-2 py-0.5 bg-blue-50 text-blue-600 rounded border border-blue-100">
-                                360长期: {user.staking360Long.toFixed(2)}
+                                创世360: {user.staking360Long.toFixed(2)}
                               </span>
                             </div>
                           </div>
