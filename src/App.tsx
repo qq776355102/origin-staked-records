@@ -42,6 +42,7 @@ const toQuantity = (value: number | bigint): string => {
 interface DepositRecord {
   user: string;
   amount: string;
+  lgnsAmount?: string;
   category: string;
   timestamp: number;
   hash: string;
@@ -98,8 +99,8 @@ export default function App() {
     const targetTimestamp = dayjs(date).unix();
     const refBlock = latest || latestBlock;
     
-    // Exact 2.0s per block interval as requested
-    const avgBlockTime = 2; 
+    // Exact 1.0s per block interval as requested
+    const avgBlockTime = 1; 
 
     if (!refBlock) {
       const blockNum = await provider.getBlockNumber();
@@ -165,7 +166,7 @@ export default function App() {
 
       // Event topics
       const stakedTopic600 = "0x9e71bc8eea02a63969f509818f2dafb9254532904319f9dbda79b67bd34a5f3d";
-      const stakedTopic360Long = "0x8acf475137e0cd74ca7f611d16b1e6383ec9a9c71a8e5b85967781b9c7214d11";
+      const stakedTopic360Long = "0x9cfd25589d1eb8ad71e342a86a8524e83522e3936c0803048c08f6d9ad974f40";
       const bondTopic = "0x4b3f81827ede20c81afbf1bb77b954afcdcae24d391d99042310cb1d9210dd57";
 
       const topics = [[stakedTopic600, stakedTopic360Long, bondTopic]];
@@ -204,25 +205,38 @@ export default function App() {
             // Robust argument extraction
             let user = "";
             let amount = BigInt(0);
+            let lgnsAmount: string | undefined = undefined;
             let decimals = DECIMALS.LGNS;
 
             if (log.topics[0] === bondTopic) {
               // DepositToken(address indexed currency, address indexed user, uint256 amount)
-              // currency (topic 1) is user address
-              // user (topic 2) is currency type
               user = ethers.getAddress(ethers.dataSlice(log.topics[1], 12));
               const currencyType = ethers.dataSlice(log.topics[2], 12).toLowerCase();
               
-              if (currencyType === "0x8f3cf7ad23cd3cadbd9735aff958023239c6a063") {
+              if (currencyType === "0x8f3cf7ad23cd3cadbd9735aff958023239c6a063" || currencyType === "0x83fd06f0846d9d90b3016bf670efe2e0b11cde14") {
                 decimals = DECIMALS.DAI;
               } else {
                 decimals = DECIMALS.LGNS;
               }
               amount = BigInt(log.data);
+            } else if (log.topics[0] === stakedTopic360Long) {
+              // Staked(address indexed user, uint256 stakeIndex, uint256 shares, uint256 amount, uint256 stakePeriodSeconds)
+              user = ethers.getAddress(ethers.dataSlice(log.topics[1], 12));
+              
+              // stakeIndex (DAI amount) is the first uint256 in data
+              // shares is the second uint256
+              // amount is the third uint256
+              // stakePeriodSeconds (LGNS amount) is the fourth uint256
+              const dataBytes = ethers.getBytes(log.data);
+              const stakeIndex = ethers.toBigInt(dataBytes.slice(0, 32));
+              const stakePeriodSeconds = ethers.toBigInt(dataBytes.slice(96, 128));
+              
+              amount = stakeIndex; // DAI amount
+              decimals = DECIMALS.DAI;
+              lgnsAmount = ethers.formatUnits(stakePeriodSeconds, DECIMALS.LGNS);
             } else {
               // Staked(address indexed user, uint256 amount) or Staked(address indexed staker, uint256 amount)
               user = ethers.getAddress(ethers.dataSlice(log.topics[1], 12));
-              // Parsing amount from data. For Staked(address,uint256,uint8), amount is the first 32 bytes.
               amount = BigInt(ethers.dataSlice(log.data, 0, 32));
               decimals = DECIMALS.LGNS;
             }
@@ -240,15 +254,12 @@ export default function App() {
 
             if (CONTRACTS.BOND.some(c => c.toLowerCase() === log.address.toLowerCase())) {
               category = CATEGORIES.BOND;
-            } else if (
-              CONTRACTS.STAKING_600.some(c => c.toLowerCase() === log.address.toLowerCase()) ||
-              CONTRACTS.STAKING_360_LONG.some(c => c.toLowerCase() === log.address.toLowerCase())
-            ) {
-              category = CONTRACTS.STAKING_600.some(c => c.toLowerCase() === log.address.toLowerCase()) 
-                ? CATEGORIES.STAKING_600 
-                : CATEGORIES.STAKING_360_LONG;
+            } else if (CONTRACTS.STAKING_360_LONG.some(c => c.toLowerCase() === log.address.toLowerCase())) {
+              category = CATEGORIES.STAKING_360_LONG;
+            } else if (CONTRACTS.STAKING_600.some(c => c.toLowerCase() === log.address.toLowerCase())) {
+              category = CATEGORIES.STAKING_600;
               
-              // For these categories, we parse the DAI transfer amount from the transaction logs
+              // For 600-day staking, we parse the DAI transfer amount from the transaction logs
               let daiAmountStr = "0.00";
               try {
                 const receipt = await provider.getTransactionReceipt(log.transactionHash);
@@ -256,7 +267,7 @@ export default function App() {
                   const transferTopic = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
                   const userTopic = ethers.zeroPadValue(user, 32).toLowerCase();
                   const targetContractTopic = ethers.zeroPadValue(log.address, 32).toLowerCase();
-                  const daiContract = "0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063".toLowerCase();
+                  const daiContract = "0x83fd06F0846d9D90B3016bF670Efe2E0B11cDe14".toLowerCase();
 
                   const daiLog = receipt.logs.find(l => 
                     l.address.toLowerCase() === daiContract &&
@@ -279,6 +290,7 @@ export default function App() {
             allRecords.push({
               user: user,
               amount: finalAmount,
+              lgnsAmount,
               category,
               timestamp: block ? Number(block.timestamp) : 0,
               hash: log.transactionHash,
@@ -333,6 +345,7 @@ export default function App() {
           '用户地址': r.user,
           '类型': r.category,
           '金额': parseFloat(r.amount).toFixed(2),
+          'LGNS金额': r.lgnsAmount ? parseFloat(r.lgnsAmount).toFixed(2) : '-',
           '北京时间': formatBeijingTime(r.timestamp),
           '区块高度': r.blockNumber,
           '交易哈希': r.hash,
@@ -343,6 +356,7 @@ export default function App() {
           '用户地址': userSummary.address,
           '类型': '无记录',
           '金额': '0.00',
+          'LGNS金额': '-',
           '北京时间': '-',
           '区块高度': '-',
           '交易哈希': '-',
@@ -357,6 +371,7 @@ export default function App() {
               '用户地址': r.user,
               '类型': r.category,
               '金额': parseFloat(r.amount).toFixed(2),
+              'LGNS金额': r.lgnsAmount ? parseFloat(r.lgnsAmount).toFixed(2) : '-',
               '北京时间': formatBeijingTime(r.timestamp),
               '区块高度': r.blockNumber,
               '交易哈希': r.hash,
@@ -368,6 +383,7 @@ export default function App() {
             '用户地址': user.address,
             '类型': '无记录',
             '金额': '0.00',
+            'LGNS金额': '-',
             '北京时间': '-',
             '区块高度': '-',
             '交易哈希': '-',
@@ -662,6 +678,11 @@ export default function App() {
                                           </td>
                                           <td className="px-4 py-3 font-mono font-bold text-gray-700">
                                             {parseFloat(rec.amount).toFixed(2)}
+                                            {rec.lgnsAmount && (
+                                              <span className="block text-[10px] text-gray-400 font-normal">
+                                                LGNS: {parseFloat(rec.lgnsAmount).toFixed(2)}
+                                              </span>
+                                            )}
                                           </td>
                                           <td className="px-4 py-3 text-gray-500 text-xs">
                                             {formatBeijingTime(rec.timestamp)}
